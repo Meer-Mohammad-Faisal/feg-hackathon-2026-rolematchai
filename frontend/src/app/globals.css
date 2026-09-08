@@ -8,6 +8,8 @@ button,input{font:inherit}
 
 button{cursor:pointer}
 
+.adaptive-icon{width:20px;height:20px;flex:0 0 20px}
+
 .shell{min-height:100vh}
 
 .topbar{height:76px;background:#fbfcfb;border-bottom:1px solid #e2eae6;display:flex;align-items:center;justify-content:space-between;padding:0 5vw;position:sticky;top:0;z-index:5}

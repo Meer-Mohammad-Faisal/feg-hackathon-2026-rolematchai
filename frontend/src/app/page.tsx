@@ -2,12 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
-import { Content, Intent, Recommendation } from '../types';
+import { Content, Intent, Recommendation, Friction } from '../types';
 import Header from '../components/Header';
 import ContentCard from '../components/ContentCard';
 import ContentDetail from '../components/ContentDetail';
 import SessionInsight from '../components/SessionInsight';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
+import { RoleIndicator } from '../components/RoleIndicator';
+import { FrictionAlert } from '../components/FrictionAlert';
+import { AdaptiveContentCard } from '../components/AdaptiveContentCard';
 
 const fallback: Content[] = Array.from({ length: 12 }, (_, i) => ({
   id: `event_${String(i + 1).padStart(3, '0')}`,
@@ -35,7 +38,7 @@ const fallback: Content[] = Array.from({ length: 12 }, (_, i) => ({
   accent: '#64e6b1'
 }));
 
-const fallbackIntent: Intent = { intent: 'GENERAL_DISCOVERY', confidence: 0.42, signals: [] };
+const fallbackIntent: Intent = { intent: 'GENERAL_DISCOVERY', confidence: 0.42, signals: [], role: 'EXPLORER' };
 
 export default function Home() {
   const [page, setPage] = useState<'home' | 'analytics' | 'demo-select'>('demo-select');
@@ -44,6 +47,7 @@ export default function Home() {
   const [category, setCategory] = useState('All');
   const [sessionId, setSessionId] = useState('');
   const [intent, setIntent] = useState<Intent>(fallbackIntent);
+  const [friction, setFriction] = useState<Friction>({ detected: false, type: null, severity: 'low', message: '' });
   const [recs, setRecs] = useState<Recommendation[]>([]);
   const [detail, setDetail] = useState<Content | null>(null);
   const [completed, setCompleted] = useState(false);
@@ -105,6 +109,7 @@ export default function Home() {
         body: JSON.stringify({ sessionId, eventType, metadata, contentId })
       });
       setIntent(r.data.intent);
+      setFriction(r.data.friction);
       const rr: any = await api(`/recommendations/${sessionId}`);
       setRecs(rr.data);
     } catch {
@@ -114,7 +119,8 @@ export default function Home() {
           category: 'Football',
           timeContext: 'Tonight / upcoming',
           confidence: 0.9,
-          signals: ['football_search', 'multiple_football_views']
+          signals: ['football_search', 'multiple_football_views'],
+          role: 'RESEARCHER'
         });
       }
     }
@@ -142,7 +148,8 @@ export default function Home() {
     : items.slice(0, 4).map(content => ({
         content,
         score: 0.5,
-        reasons: ['Popular in your discovery feed']
+        reasons: ['Popular in your discovery feed'],
+        explanation: 'This content is popular in your discovery feed.'
       }));
 
   const showSessionInsight = intent.intent !== 'GENERAL_DISCOVERY' && sessionMode === 'intelligent';
@@ -231,7 +238,17 @@ export default function Home() {
                     Mode: {sessionMode === 'control' ? 'Control' : 'Intelligent'}
                   </div>
                 </div>
+                {sessionMode === 'intelligent' && (
+                  <RoleIndicator role={intent.role} />
+                )}
               </div>
+
+              {sessionMode === 'intelligent' && friction.detected && (
+                <FrictionAlert
+                  friction={friction}
+                  onDismiss={() => setFriction({ detected: false, type: null, severity: 'low', message: '' })}
+                />
+              )}
 
               <div className="toolbar">
                 <input
@@ -288,7 +305,16 @@ export default function Home() {
                 </div>
                 <div className="grid">
                   {top.map((rec, i) => (
-                    <ContentCard key={i} item={rec.content} onOpen={open} recommendation={rec} />
+                    sessionMode === 'intelligent' ? (
+                      <AdaptiveContentCard
+                        key={i}
+                        content={rec.content}
+                        role={intent.role}
+                        onClick={() => open(rec.content)}
+                      />
+                    ) : (
+                      <ContentCard key={i} item={rec.content} onOpen={open} recommendation={rec} />
+                    )
                   ))}
                 </div>
               </section>

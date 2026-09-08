@@ -1,5 +1,36 @@
-import { Intent, SessionEvent } from '../types';
+import { Intent, SessionEvent, SessionRole } from '../types';
 import { aiIntentService } from './aiIntentService';
+
+function detectRole(events: SessionEvent[]): SessionRole {
+  const views = events.filter(e => e.eventType === 'CONTENT_VIEWED');
+  const searches = events.filter(e => e.eventType === 'SEARCH');
+  const filters = events.filter(e => e.eventType === 'FILTER_USED');
+  const actions = events.filter(e => e.eventType === 'ACTION_STARTED' || e.eventType === 'ACTION_COMPLETED');
+
+  // Explorer: Initial browsing, few views, no actions
+  if (views.length < 3 && actions.length === 0) {
+    return 'EXPLORER';
+  }
+
+  // Researcher: Multiple views of same category, no actions yet
+  const categories = new Set(views.map(e => String(e.metadata.category || '')));
+  if (views.length >= 3 && categories.size <= 2 && actions.length === 0) {
+    return 'RESEARCHER';
+  }
+
+  // Comparator: Viewing multiple items, possibly comparing
+  if (views.length >= 5 && categories.size >= 2 && actions.length === 0) {
+    return 'COMPARATOR';
+  }
+
+  // Decision-ready: Has started or completed actions
+  if (actions.length > 0) {
+    return 'DECISION_READY';
+  }
+
+  // Default to Explorer if no clear pattern
+  return 'EXPLORER';
+}
 
 export function detectIntent(events: SessionEvent[]): Intent {
   const searches = events.filter(e => e.eventType === 'SEARCH');
@@ -32,13 +63,16 @@ export function detectIntent(events: SessionEvent[]): Intent {
 
   if (upcoming) signals.push('time_preference');
 
+  const role = detectRole(events);
+
   if (football >= 3) {
     return {
       intent: 'FOOTBALL_DISCOVERY',
       category: 'Football',
       timeContext: upcoming ? 'Tonight / upcoming' : undefined,
       confidence: Math.min(0.98, 0.7 + football * 0.04),
-      signals
+      signals,
+      role
     };
   }
 
@@ -48,7 +82,8 @@ export function detectIntent(events: SessionEvent[]): Intent {
       category: 'Basketball',
       timeContext: upcoming ? 'Tonight / upcoming' : undefined,
       confidence: Math.min(0.98, 0.7 + basketball * 0.04),
-      signals
+      signals,
+      role
     };
   }
 
@@ -58,7 +93,8 @@ export function detectIntent(events: SessionEvent[]): Intent {
       category: 'Tennis',
       timeContext: upcoming ? 'Tonight / upcoming' : undefined,
       confidence: Math.min(0.98, 0.7 + tennis * 0.04),
-      signals
+      signals,
+      role
     };
   }
 
@@ -67,14 +103,16 @@ export function detectIntent(events: SessionEvent[]): Intent {
       intent: 'UPCOMING_DISCOVERY',
       timeContext: 'Tonight / upcoming',
       confidence: 0.78,
-      signals
+      signals,
+      role
     };
   }
 
   return {
     intent: 'GENERAL_DISCOVERY',
     confidence: 0.42,
-    signals
+    signals,
+    role
   };
 }
 
@@ -86,7 +124,9 @@ export async function detectIntentWithAI(events: SessionEvent[], query?: string)
         events: events.slice(-5), // Last 5 events for context
         recentCategories: events.filter(e => e.eventType === 'CONTENT_VIEWED').map(e => e.metadata.category)
       };
-      return await aiIntentService.parseIntent(query, context);
+      const aiIntent = await aiIntentService.parseIntent(query, context);
+      // Add role detection to AI result
+      return { ...aiIntent, role: detectRole(events) };
     } catch (error) {
       console.log('AI intent parsing failed, falling back to deterministic engine');
     }

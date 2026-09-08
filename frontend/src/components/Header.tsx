@@ -1,6 +1,6 @@
 interface HeaderProps {
-  currentPage: 'home' | 'analytics';
-  onPageChange: (page: 'home' | 'analytics') => void;
+  currentPage: 'home' | 'analytics' | 'demo-select';
+  onPageChange: (page: 'home' | 'analytics' | 'demo-select') => void;
 }
 
 export default function Header({ currentPage, onPageChange }: HeaderProps) {

@@ -6,6 +6,7 @@ import { content, sessions, allEvents, findContent } from './data';
 import { detectIntent, detectIntentWithAI } from './services/intentService';
 import { recommend } from './services/recommendationService';
 import { analytics } from './services/analyticsService';
+import { detectFriction } from './services/frictionService';
 import { setSessionContext, getSessionContext, setRecommendations, getRecommendations } from './cache';
 
 const app = express();
@@ -42,7 +43,8 @@ app.post('/api/session/start', async (req, res) => {
     startedAt: new Date().toISOString(),
     mode,
     events: [],
-    intent: detectIntent([])
+    intent: detectIntent([]),
+    friction: detectFriction([])
   } as any;
   sessions.set(id, s);
 
@@ -68,7 +70,8 @@ app.post('/api/events', async (req, res) => {
       'RECOMMENDATION_CLICKED',
       'ACTION_STARTED',
       'ACTION_COMPLETED',
-      'SESSION_ENDED'
+      'SESSION_ENDED',
+      'NAVIGATION_BACK'
     ]),
     contentId: z.string().optional(),
     metadata: z.record(z.unknown()).default({})
@@ -96,7 +99,10 @@ app.post('/api/events', async (req, res) => {
     s.intent = detectIntent(s.events);
   }
 
-  res.status(201).json({ data: { event, intent: s.intent } });
+  // Update friction detection
+  s.friction = detectFriction(s.events);
+
+  res.status(201).json({ data: { event, intent: s.intent, friction: s.friction } });
 });
 
 app.get('/api/recommendations/:sessionId', async (req, res) => {

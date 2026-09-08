@@ -1,0 +1,11 @@
+{
+  "name": "sessioniq-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "test": "npm --prefix backend test",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": { "concurrently": "^9.1.2", "playwright": "^1.51.1" }
+}
